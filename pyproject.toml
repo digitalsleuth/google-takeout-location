@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["debian*", "binaries*", "build*", "dist*"]
+
+[project]
+name = "gtl"
+version = "2.0.0"
+dependencies = [
+    "simplekml",
+    "tzdata"
+]
+requires-python = ">=3.9"
+authors = [
+  {name = "Corey Forman (digitalsleuth)", email = "github@digitalsleuth.ca"}
+]
+maintainers = [
+  {name = "Corey Forman (digitalsleuth)", email = "github@digitalsleuth.ca"}
+]
+description = "Python 3 script to parse the Google Takeout Location JSON file"
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["digital forensics", "dfir", "takeout", "kml", "google-takeout"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+Homepage = "https://github.com/digitalsleuth/google-takeout-location"
+
+[project.scripts]
+gtl = "gtl.gtl:main"
