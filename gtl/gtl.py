@@ -20,7 +20,7 @@ from zoneinfo import ZoneInfo, available_timezones
 import simplekml
 
 __author__ = "Corey Forman (digitalsleuth)"
-__version__ = "2.1"
+__version__ = "2.2"
 __date__ = "29 Jan 2025"
 __description__ = "Google Takeout Location JSON parser"
 
@@ -98,7 +98,8 @@ def generate_kml(filename, all_data):
         )
         if coord_len > 2:
             for each in this_trip_coords[1 : coord_len - 1]:
-                folder.newpoint(name="Waypoint", coords=[each])
+                wpt_num = this_trip_coords.index(each)
+                folder.newpoint(name=f"Waypoint {wpt_num}", coords=[each])
         end_point = folder.newpoint(name=f"End - {end_time}")
         end_point.coords = [this_trip_coords[-1]]
         end_point.style.iconstyle.icon.href = (
@@ -112,7 +113,7 @@ def generate_kml(filename, all_data):
         print(f"Error encountered trying to save KML file - {err}")
 
 
-def parse_json(loaded_json, tz="UTC"):
+def parse_json(loaded_json, tz="UTC", date=None):
     parsed_data = []
     for item in loaded_json["timelineObjects"]:
         wpts = []
@@ -185,6 +186,11 @@ def parse_json(loaded_json, tz="UTC"):
                 detail.append(f"Probability: {probability}")
             else:
                 detail.append("Probability: unknown")
+            trip_date_start = start_time.split(" ")[0]
+            trip_date_end = end_time.split(" ")[0]
+            if date:
+                if date not in (trip_date_start, trip_date_end):
+                    continue
             parsed_data.append(
                 [
                     start_ms,
@@ -249,6 +255,11 @@ def parse_json(loaded_json, tz="UTC"):
                             f"{float(point['lngE7'] / 10000000)}",
                         ]
                     )
+            trip_date_start = start_time.split(" ")[0]
+            trip_date_end = end_time.split(" ")[0]
+            if date:
+                if date not in (trip_date_start, trip_date_end):
+                    continue
             parsed_data.append(
                 [
                     start_ms,
@@ -310,7 +321,7 @@ def generate_csv(filename, parsed_data):
     except Exception as err:
         print(f"Unable to write CSV: {err}")
         sys.exit(1)
-    print(f"CSV File {output_file} written successfully")
+    print(f"CSV file generated - {output_file}")
 
 
 def print_available_timezones():
@@ -329,6 +340,9 @@ def main():
     )
     arg_parse.add_argument("-c", "--csv", help="Output a CSV file", action="store_true")
     arg_parse.add_argument(
+        "-d", "--date", help="Specific date to look for - 'YYYY-MM-DD'"
+    )
+    arg_parse.add_argument(
         "-i", "--input", metavar="input_file", help="JSON file", required=True
     )
     arg_parse.add_argument("-k", "--kml", help="Output a KML file", action="store_true")
@@ -336,7 +350,11 @@ def main():
         "-l", "--list", help="List available timezones", action="store_true"
     )
     arg_parse.add_argument(
-        "-t", "--tz", help="Select a timezone for output", type=str, default="UTC"
+        "-t",
+        "--tz",
+        help="Select a timezone for output - '<tz_name>'",
+        type=str,
+        default="UTC",
     )
     if len(sys.argv[1:]) == 0:
         arg_parse.print_help()
@@ -350,11 +368,11 @@ def main():
         sys.exit(1)
     if args.tz and args.tz not in available_timezones():
         print(
-            "Your selected timezone cannot be identified. Please run this script with -l / --list to see the available timezones and try again.\nMake sure you place quotes around the timezone as well."
+            "Your selected timezone cannot be identified. Please run this script with -l / --list to see the available timezones and try again."
         )
         sys.exit(1)
     json_content = ingest(args.input)
-    parsed_data = parse_json(json_content, args.tz)
+    parsed_data = parse_json(json_content, args.tz, args.date)
     if args.kml:
         generate_kml(args.input, parsed_data)
     if args.csv:
