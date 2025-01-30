@@ -15,12 +15,12 @@ import os
 import sys
 import argparse
 import csv
-from datetime import datetime as dt
+from datetime import datetime as dt, timezone
 from zoneinfo import ZoneInfo, available_timezones
 import simplekml
 
 __author__ = "Corey Forman (digitalsleuth)"
-__version__ = "2.0"
+__version__ = "2.1"
 __date__ = "29 Jan 2025"
 __description__ = "Google Takeout Location JSON parser"
 
@@ -133,20 +133,20 @@ def parse_json(loaded_json, tz="UTC"):
             else:
                 source = "UNKNOWN - No sourceInfo key"
             start_ms = int(act["duration"]["startTimestampMs"])
-            start_time = dt.utcfromtimestamp(
-                int(act["duration"]["startTimestampMs"]) / 1000
+            start_time = dt.fromtimestamp(
+                int(act["duration"]["startTimestampMs"]) / 1000, timezone.utc
             )
             end_ms = int(act["duration"]["endTimestampMs"])
-            end_time = dt.utcfromtimestamp(
-                int(act["duration"]["endTimestampMs"]) / 1000
+            end_time = dt.fromtimestamp(
+                int(act["duration"]["endTimestampMs"]) / 1000, timezone.utc
             )
             if tz != "UTC":
                 tz = ZoneInfo(str(tz))
-                start_time = start_time.replace(tzinfo=ZoneInfo("UTC"))
+                start_time = start_time.replace(tzinfo=timezone.utc)
                 start_time = start_time.astimezone(tz).strftime(
                     f"%Y-%m-%d %H:%M:%S {tz}"
                 )
-                end_time = end_time.replace(tzinfo=ZoneInfo("UTC"))
+                end_time = end_time.replace(tzinfo=timezone.utc)
                 end_time = end_time.astimezone(tz).strftime(f"%Y-%m-%d %H:%M:%S {tz}")
             else:
                 start_time = start_time.strftime(f"%Y-%m-%d %H:%M:%S {tz}")
@@ -221,20 +221,20 @@ def parse_json(loaded_json, tz="UTC"):
                 loc_type = "NO_LOCATION_TYPE"
             source = location["sourceInfo"]
             start_ms = int(place["duration"]["startTimestampMs"])
-            start_time = dt.utcfromtimestamp(
-                int(place["duration"]["startTimestampMs"]) / 1000
+            start_time = dt.fromtimestamp(
+                int(place["duration"]["startTimestampMs"]) / 1000, timezone.utc
             )
             end_ms = int(place["duration"]["endTimestampMs"])
-            end_time = dt.utcfromtimestamp(
-                int(place["duration"]["endTimestampMs"]) / 1000
+            end_time = dt.fromtimestamp(
+                int(place["duration"]["endTimestampMs"]) / 1000, timezone.utc
             )
             if tz != "UTC":
                 tz = ZoneInfo(str(tz))
-                start_time = start_time.replace(tzinfo=ZoneInfo("UTC"))
+                start_time = start_time.replace(tzinfo=timezone.utc)
                 start_time = start_time.astimezone(tz).strftime(
                     f"%Y-%m-%d %H:%M:%S {tz}"
                 )
-                end_time = end_time.replace(tzinfo=ZoneInfo("UTC"))
+                end_time = end_time.replace(tzinfo=timezone.utc)
                 end_time = end_time.astimezone(tz).strftime(f"%Y-%m-%d %H:%M:%S {tz}")
             else:
                 start_time = start_time.strftime(f"%Y-%m-%d %H:%M:%S {tz}")
