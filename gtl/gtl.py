@@ -20,8 +20,8 @@ from zoneinfo import ZoneInfo, available_timezones
 import simplekml
 
 __author__ = "Corey Forman (digitalsleuth)"
-__version__ = "2.2"
-__date__ = "29 Jan 2025"
+__version__ = "2.3"
+__date__ = "02 Feb 2025"
 __description__ = "Google Takeout Location JSON parser"
 
 
@@ -299,23 +299,24 @@ def generate_csv(filename, parsed_data):
         "detail",
     ]
     try:
-        writer = csv.DictWriter(out_csv, header)
+        writer = csv.DictWriter(out_csv, header, delimiter="|")
         writer.writeheader()
         for trip in parsed_data:
-            row = {}
-            row["start_epoch"] = trip[0]
-            row["start_time"] = trip[1]
-            row["start_lat"] = trip[2]
-            row["start_long"] = trip[3]
-            row["waypoints"] = trip[4]
-            row["end_lat"] = trip[5]
-            row["end_long"] = trip[6]
-            row["end_epoch"] = trip[7]
-            row["end_time"] = trip[8]
-            row["activity_place_type"] = trip[9]
-            row["confidence"] = trip[10]
-            row["source"] = trip[11]
-            row["detail"] = trip[12]
+            row = {
+                "start_epoch": trip[0],
+                "start_time": trip[1],
+                "start_lat": trip[2],
+                "start_long": trip[3],
+                "waypoints": trip[4],
+                "end_lat": trip[5],
+                "end_long": trip[6],
+                "end_epoch": trip[7],
+                "end_time": trip[8],
+                "activity_place_type": trip[9],
+                "confidence": trip[10],
+                "source": trip[11],
+                "detail": trip[12],
+            }
             writer.writerow(row)
         out_csv.close()
     except Exception as err:

@@ -5,7 +5,7 @@ Python 3 script to parse Google Takeout Location JSON files into KML.
 ```bash
 usage: gtl.py [-h] [-c] [-d DATE] -i input_file [-k] [-l] [-t TZ]
 
-Google Takeout Location Parser v2.2
+Google Takeout Location Parser v2.3
 
 options:
   -h, --help            show this help message and exit
