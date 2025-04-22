@@ -31,7 +31,7 @@ def ingest(json_file):
     return results
 
 
-def generate_kml(filename, all_data, fmt, batch):
+def generate_kml(filename, all_data, fmt, batch, search_grid=None):
     """Generates a KML file from the trip data"""
     normal_icon = "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png"
     highlight_icon = (
@@ -46,7 +46,18 @@ def generate_kml(filename, all_data, fmt, batch):
     kml = simplekml.Kml()
     range_start = None
     range_end = None
+    if search_grid:
+        bounds = create_search_grid(search_grid[1], search_grid[0])
+    else:
+        bounds = None    
     for i, this_trip in enumerate(all_data, start=1):
+        if bounds:
+            if fmt == "timeline":
+                if not within_search_grid(float(this_trip[2]), float(this_trip[3]), bounds):
+                    continue
+            elif fmt == "locations":
+                if not within_search_grid(float(this_trip[1]), float(this_trip[2]), bounds):
+                    continue
         folder = kml.newfolder()
         plot = folder.newlinestring(name=f"{map_type} {i}", tessellate=1)
         plot.stylemap.normalstyle.labelstyle.scale = 0
@@ -156,7 +167,6 @@ def generate_kml(filename, all_data, fmt, batch):
             this_trip_coords.append((this_trip[2], this_trip[1]))
             for coord in this_trip_coords:
                 plot.description += f"{coord[0]},{coord[1]}\n"
-            coord_len = len(this_trip_coords)
             plot.coords = this_trip_coords
             plot_point = folder.newpoint(name=f"{map_type} {i} - {location_timestamp}")
             plot_point.coords = [this_trip_coords[0]]
@@ -532,6 +542,21 @@ def generate_excel(filename, parsed_data, fmt):
                 sys.exit(1)
     print(f"[+] Excel file generated - {output_file}")
 
+def create_search_grid(coord1, coord2):
+    lat1, long1 = coord1
+    lat2, long2 = coord2
+
+    return (
+        min(lat1, lat2),
+        max(lat1, lat2),
+        min(long1, long2),
+        max(long1, long2),
+    )
+
+def within_search_grid(lat, long, bounds):
+    min_lat, max_lat, min_long, max_long = bounds
+    return min_lat <= lat <= max_lat and min_long <= long <= max_long
+
 
 def chunk_list(sheet_dict, sheet_name):
     chunks = []
@@ -563,6 +588,12 @@ def print_available_timezones():
 
 def main():
     """Argument Parsing"""
+    def parse_coord(s):
+        try:
+            lat_str, lon_str = s.split(",")
+            return float(lat_str), float(lon_str)
+        except ValueError:
+            raise argparse.ArgumentTypeError("Coordinates must be in format: lat,lon")    
     arg_parse = argparse.ArgumentParser(
         description=f"Google Takeout Location Parser v{str(__version__)}"
     )
@@ -579,6 +610,12 @@ def main():
     arg_parse.add_argument("-k", "--kml", help="Output a KML file", action="store_true")
     arg_parse.add_argument(
         "-l", "--list", help="List available timezones", action="store_true"
+    )
+    arg_parse.add_argument(
+        "--top-left", type=parse_coord, help="Top-left coordinate of search grid: lat,long"
+    )
+    arg_parse.add_argument(
+        "--bottom-right", type=parse_coord, help="Bottom-right coordinate of search grid: lat, long"
     )
     arg_parse.add_argument(
         "-t",
@@ -606,6 +643,11 @@ def main():
             "[!] Your selected timezone cannot be identified. Please run this script with -l / --list to see the available timezones and try again."
         )
         sys.exit(1)
+    if args.top_left and args.bottom_right:
+        search_grid = [args.top_left, args.bottom_right]
+        print(f"[+] Creating a search grid between {args.top_left} and {args.bottom_right}")
+    else:
+        search_grid = None
     print(f"[-] Ingesting {filename}")
     json_content = ingest(filename)
     print("[-] Parsing json content")
@@ -617,7 +659,7 @@ def main():
         print(f"[-] Started KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}")
         if args.date:
             filename = f"{filename}-{args.date}"
-        generate_kml(filename, parsed_data, fmt, args.batch)
+        generate_kml(filename, parsed_data, fmt, args.batch, search_grid)
         print(
             f"[+] Finished KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
