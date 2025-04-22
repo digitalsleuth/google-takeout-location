@@ -7,8 +7,10 @@ exclude = ["debian*", "binaries*", "build*", "dist*"]
 
 [project]
 name = "gtl"
-version = "2.3.0"
+version = "3.0.0"
 dependencies = [
+    "pandas",
+    "xlsxwriter",
     "simplekml",
     "tzdata"
 ]
