@@ -31,14 +31,14 @@ def ingest(json_file):
     return results
 
 
-def generate_kml(filename, all_data, fmt):
+def generate_kml(filename, all_data, fmt, batch):
     """Generates a KML file from the trip data"""
     normal_icon = "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png"
     highlight_icon = (
         "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png"
     )
     map_type = None
-    batch_size = 2500
+    batch_size = batch
     if fmt == "timeline":
         map_type = "Trip"
     elif fmt == "locations":
@@ -567,6 +567,10 @@ def main():
         description=f"Google Takeout Location Parser v{str(__version__)}"
     )
     arg_parse.add_argument(
+        "-b", "--batch", help="Sets batch size for KML output, default is 2500", 
+        type=int, default=2500
+    )
+    arg_parse.add_argument(
         "-d", "--date", help="Specific date to look for - 'YYYY-MM-DD'"
     )
     arg_parse.add_argument(
@@ -613,7 +617,7 @@ def main():
         print(f"[-] Started KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}")
         if args.date:
             filename = f"{filename}-{args.date}"
-        generate_kml(filename, parsed_data, fmt)
+        generate_kml(filename, parsed_data, fmt, args.batch)
         print(
             f"[+] Finished KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
