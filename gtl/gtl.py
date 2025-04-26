@@ -281,7 +281,7 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
                 detail.append(f"Probability: {probability}")
             else:
                 detail.append("Probability: unknown")
-            if date_range or time_range:
+            if date_range and time_range:
                 start_date_in_scope, start_time_in_scope = date_filter(
                     start_time, date_range, time_range, tz
                 )
@@ -289,8 +289,8 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
                     end_time, date_range, time_range, tz
                 )
                 if not (
-                    (start_date_in_scope or start_time_in_scope)
-                    or (end_date_in_scope or end_time_in_scope)
+                    (start_date_in_scope and start_time_in_scope)
+                    or (end_date_in_scope and end_time_in_scope)
                 ):
                     continue
             parsed_data.append(
@@ -364,8 +364,8 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
                     end_time, date_range, time_range, tz
                 )
                 if not (
-                    (start_date_in_scope or start_time_in_scope)
-                    or (end_date_in_scope or end_time_in_scope)
+                    (start_date_in_scope and start_time_in_scope)
+                    or (end_date_in_scope and end_time_in_scope)
                 ):
                     continue
             parsed_data.append(
@@ -412,7 +412,7 @@ def get_locations(loaded_json, tz="UTC", date_range=None, time_range=None):
             date_in_scope, time_in_scope = date_filter(
                 timestamp, date_range, time_range, tz
             )
-            if not (date_in_scope or time_in_scope):
+            if not (date_in_scope and time_in_scope):
                 continue
         activity_details = []
         motion_details = []
@@ -709,13 +709,27 @@ def main():
     if args.top_left and args.bottom_right:
         search_grid = [args.top_left, args.bottom_right]
         print(
-            f"[+] Creating a search grid between {args.top_left} and {args.bottom_right}"
+            f"[-] Creating a search grid between {args.top_left} and {args.bottom_right}"
         )
     else:
         search_grid = None
+    if args.date_range and args.time_range:
+        if ".." not in args.date_range or ".." not in args.time_range:
+            print(
+                "[!] Make sure your date range is YYYY-MM-DD..YYYY-MM-DD and your time range is HH:MM:SS..HH:MM:SS and surround each range with quotes"
+            )
+            sys.exit(1)
+        print(
+            f"[-] Filtering on dates {args.date_range.split('..')[0]} and {args.date_range.split('..')[1]}"
+        )
+        print(
+            f"[-] Filtering on times {args.time_range.split('..')[0]} and {args.time_range.split('..')[1]}"
+        )
+        filename = f"{filename}-{args.date_range}"    
     print(f"[-] Ingesting {filename}")
     json_content = ingest(filename)
     print("[-] Parsing json content")
+
     parsed_data, fmt = parse_json(
         json_content, args.tz, args.date_range, args.time_range
     )
@@ -724,8 +738,6 @@ def main():
             "[-] Generating KML file. This can take a long time for large datasets. Please be patient."
         )
         print(f"[-] Started KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        # if args.date_range and args.time_range:
-        #    filename = f"{filename}-{args.date_range}-{args.time_range}"
         generate_kml(filename, parsed_data, fmt, args.batch, search_grid)
         print(
             f"[+] Finished KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -735,8 +747,6 @@ def main():
             "[-] Generating Excel file. This can take a long time for large datasets. Please be patient."
         )
         print(f"[-] Started Excel generation at {dt.now()}")
-        # if args.date_range and args.time_range:
-        #    filename = f"{filename}-{args.date_range}-{args.time_range}"
         generate_excel(filename, parsed_data, fmt)
         print(f"[+] Finished Excel generation at {dt.now()}")
 
