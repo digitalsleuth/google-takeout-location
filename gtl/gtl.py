@@ -725,7 +725,6 @@ def main():
         print(
             f"[-] Filtering on times {args.time_range.split('..')[0]} and {args.time_range.split('..')[1]}"
         )
-        filename = f"{filename}-{args.date_range}"    
     print(f"[-] Ingesting {filename}")
     json_content = ingest(filename)
     print("[-] Parsing json content")
@@ -733,6 +732,8 @@ def main():
     parsed_data, fmt = parse_json(
         json_content, args.tz, args.date_range, args.time_range
     )
+    if args.date_range and args.time_range:
+        filename = f"{filename}-{args.date_range}"
     if args.kml:
         print(
             "[-] Generating KML file. This can take a long time for large datasets. Please be patient."
