@@ -21,7 +21,7 @@ import simplekml
 
 __author__ = "Corey Forman (digitalsleuth)"
 __version__ = "3.0"
-__date__ = "21 Apr 2025"
+__date__ = "30 Apr 2025"
 __description__ = "Google Takeout Location JSON parser"
 
 
@@ -31,7 +31,7 @@ def ingest(json_file):
     return results
 
 
-def generate_kml(filename, all_data, fmt, batch, search_grid=None):
+def generate_kml(filename, all_data, fmt, batch):
     """Generates a KML file from the trip data"""
     normal_icon = "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png"
     highlight_icon = (
@@ -46,22 +46,7 @@ def generate_kml(filename, all_data, fmt, batch, search_grid=None):
     kml = simplekml.Kml()
     range_start = None
     range_end = None
-    if search_grid:
-        bounds = create_search_grid(search_grid[1], search_grid[0])
-    else:
-        bounds = None
     for i, this_trip in enumerate(all_data, start=1):
-        if bounds:
-            if fmt == "timeline":
-                if not within_search_grid(
-                    float(this_trip[2]), float(this_trip[3]), bounds
-                ):
-                    continue
-            elif fmt == "locations":
-                if not within_search_grid(
-                    float(this_trip[2]), float(this_trip[3]), bounds
-                ):
-                    continue
         folder = kml.newfolder()
         plot = folder.newlinestring(name=f"{map_type} {i}", tessellate=1)
         plot.stylemap.normalstyle.labelstyle.scale = 0
@@ -210,8 +195,14 @@ def generate_kml(filename, all_data, fmt, batch, search_grid=None):
             print(f"[!] Error encountered trying to save KML file - {err}")
 
 
-def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None):
+def get_timeline_objects(
+    loaded_json, tz="UTC", date_range=None, time_range=None, search_grid=None
+):
     parsed_data = []
+    if search_grid:
+        bounds = create_search_grid(search_grid[1], search_grid[0])
+    else:
+        bounds = None
     for item in loaded_json["timelineObjects"]:
         wpts = []
         pts = []
@@ -223,13 +214,13 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
             loc_start_long = float(act["startLocation"]["longitudeE7"] / 10000000)
             loc_end_lat = float(act["endLocation"]["latitudeE7"] / 10000000)
             loc_end_long = float(act["endLocation"]["longitudeE7"] / 10000000)
-            if (
-                "sourceInfo" in act["startLocation"]
-                and "sourceInfo" in act["endLocation"]
-            ):
-                source = f"{act['startLocation']['sourceInfo']}, {act['endLocation']['sourceInfo']}"
-            else:
-                source = "UNKNOWN - No sourceInfo key"
+            if bounds:
+                start_in_grid = within_search_grid(
+                    loc_start_lat, loc_start_long, bounds
+                )
+                end_in_grid = within_search_grid(loc_end_lat, loc_end_long, bounds)
+                if not (start_in_grid or end_in_grid):
+                    continue
             start_ms = int(act["duration"]["startTimestampMs"])
             start_time = dt.fromtimestamp(
                 int(act["duration"]["startTimestampMs"]) / 1000, timezone.utc
@@ -247,6 +238,26 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
             else:
                 start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
                 end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
+            if date_range and time_range:
+                start_date_in_scope, start_time_in_scope = date_filter(
+                    start_time, date_range, time_range, tz
+                )
+                end_date_in_scope, end_time_in_scope = date_filter(
+                    end_time, date_range, time_range, tz
+                )
+                if not (
+                    (start_date_in_scope and start_time_in_scope)
+                    or (end_date_in_scope and end_time_in_scope)
+                ):
+                    continue
+            if (
+                "sourceInfo" in act["startLocation"]
+                and "sourceInfo" in act["endLocation"]
+            ):
+                source = f"{act['startLocation']['sourceInfo']}, {act['endLocation']['sourceInfo']}"
+            else:
+                source = "UNKNOWN - No sourceInfo key"
+
             activity_type = act["activityType"]
             if "confidence" in act:
                 confidence = act["confidence"].replace("_CONFIDENCE", "")
@@ -281,18 +292,7 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
                 detail.append(f"Probability: {probability}")
             else:
                 detail.append("Probability: unknown")
-            if date_range and time_range:
-                start_date_in_scope, start_time_in_scope = date_filter(
-                    start_time, date_range, time_range, tz
-                )
-                end_date_in_scope, end_time_in_scope = date_filter(
-                    end_time, date_range, time_range, tz
-                )
-                if not (
-                    (start_date_in_scope and start_time_in_scope)
-                    or (end_date_in_scope and end_time_in_scope)
-                ):
-                    continue
+
             parsed_data.append(
                 [
                     start_ms,
@@ -316,19 +316,9 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
             location = place["location"]
             loc_lat = float(location["latitudeE7"] / 10000000)
             loc_long = float(location["longitudeE7"] / 10000000)
-            place_id = location["placeId"]
-            address = location["address"]
-            loc_name = location["name"]
-            detail.append(
-                f"Place ID: {place_id} - Address: {address} - Name: {loc_name}"
-            )
-            if "locationConfidence" in location:
-                detail.append(f"Location Confidence: {location['locationConfidence']}")
-            if "semanticType" in location:
-                loc_type = location["semanticType"].replace("TYPE_", "")
-            else:
-                loc_type = "NO_LOCATION_TYPE"
-            source = location["sourceInfo"]
+            if bounds:
+                if not within_search_grid(loc_lat, loc_long, bounds):
+                    continue
             start_ms = int(place["duration"]["startTimestampMs"])
             start_time = dt.fromtimestamp(
                 int(place["duration"]["startTimestampMs"]) / 1000, timezone.utc
@@ -346,16 +336,6 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
             else:
                 start_time = start_time.strftime("%Y-%m-%d %H:%M:%S")
                 end_time = end_time.strftime("%Y-%m-%d %H:%M:%S")
-            confidence = place["placeConfidence"].replace("_CONFIDENCE", "")
-            if "simplifiedRawPath" in place:
-                path = place["simplifiedRawPath"]
-                for point in path["points"]:
-                    pts.append(
-                        [
-                            f"{float(point['latE7'] / 10000000)}",
-                            f"{float(point['lngE7'] / 10000000)}",
-                        ]
-                    )
             if date_range or time_range:
                 start_date_in_scope, start_time_in_scope = date_filter(
                     start_time, date_range, time_range, tz
@@ -368,6 +348,30 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
                     or (end_date_in_scope and end_time_in_scope)
                 ):
                     continue
+            place_id = location["placeId"]
+            address = location["address"]
+            loc_name = location["name"]
+            detail.append(
+                f"Place ID: {place_id} - Address: {address} - Name: {loc_name}"
+            )
+            if "locationConfidence" in location:
+                detail.append(f"Location Confidence: {location['locationConfidence']}")
+            if "semanticType" in location:
+                loc_type = location["semanticType"].replace("TYPE_", "")
+            else:
+                loc_type = "NO_LOCATION_TYPE"
+            source = location["sourceInfo"]
+            confidence = place["placeConfidence"].replace("_CONFIDENCE", "")
+            if "simplifiedRawPath" in place:
+                path = place["simplifiedRawPath"]
+                for point in path["points"]:
+                    pts.append(
+                        [
+                            f"{float(point['latE7'] / 10000000)}",
+                            f"{float(point['lngE7'] / 10000000)}",
+                        ]
+                    )
+
             parsed_data.append(
                 [
                     start_ms,
@@ -389,18 +393,20 @@ def get_timeline_objects(loaded_json, tz="UTC", date_range=None, time_range=None
     return parsed_data
 
 
-def get_locations(loaded_json, tz="UTC", date_range=None, time_range=None):
+def get_locations(
+    loaded_json, tz="UTC", date_range=None, time_range=None, search_grid=None
+):
     parsed_data = []
+    if search_grid:
+        bounds = create_search_grid(search_grid[1], search_grid[0])
+    else:
+        bounds = None
     for location in loaded_json["locations"]:
         locLat = float(location["latitudeE7"] / 10000000)
         locLong = float(location["longitudeE7"] / 10000000)
-        locAccuracy = location["accuracy"]
-        source = location["source"]
-        deviceTag = location["deviceTag"]
-        if "deviceDesignation" in location:
-            deviceDesignation = location["deviceDesignation"]
-        else:
-            deviceDesignation = "None"
+        if bounds:
+            if not within_search_grid(float(locLat), float(locLong), bounds):
+                continue
         timestamp = dt.fromisoformat(location["timestamp"]).isoformat(
             timespec="milliseconds"
         )
@@ -414,6 +420,13 @@ def get_locations(loaded_json, tz="UTC", date_range=None, time_range=None):
             )
             if not (date_in_scope and time_in_scope):
                 continue
+        locAccuracy = location["accuracy"]
+        source = location["source"]
+        deviceTag = location["deviceTag"]
+        if "deviceDesignation" in location:
+            deviceDesignation = location["deviceDesignation"]
+        else:
+            deviceDesignation = "None"
         activity_details = []
         motion_details = []
         if "activity" in location:
@@ -454,15 +467,25 @@ def get_locations(loaded_json, tz="UTC", date_range=None, time_range=None):
     return sorted_data
 
 
-def parse_json(loaded_json, tz="UTC", date_range=None, time_range=None):
+def parse_json(
+    loaded_json, tz="UTC", date_range=None, time_range=None, search_grid=None
+):
     if "timelineObjects" in loaded_json:
         parsed_data = get_timeline_objects(
-            loaded_json, tz=tz, date_range=date_range, time_range=time_range
+            loaded_json,
+            tz=tz,
+            date_range=date_range,
+            time_range=time_range,
+            search_grid=search_grid,
         )
         fmt = "timeline"
     elif "locations" in loaded_json:
         parsed_data = get_locations(
-            loaded_json, tz=tz, date_range=date_range, time_range=time_range
+            loaded_json,
+            tz=tz,
+            date_range=date_range,
+            time_range=time_range,
+            search_grid=search_grid,
         )
         fmt = "locations"
     else:
@@ -626,8 +649,8 @@ def date_filter(timestamp, date_range, time_range, tz="UTC"):
     dt_obj = dt.fromisoformat(timestamp).astimezone(tz_obj)
     if date_range:
         start_date, end_date = date_range.split("..")
-        s_date = dt.fromisoformat(start_date).astimezone(tz_obj).date()
-        e_date = dt.fromisoformat(end_date).astimezone(tz_obj).date()
+        s_date = dt.fromisoformat(start_date).date()
+        e_date = dt.fromisoformat(end_date).date()
         if s_date <= dt_obj.date() <= e_date:
             date_scope = True
     if time_range:
@@ -730,7 +753,7 @@ def main():
     print("[-] Parsing json content")
 
     parsed_data, fmt = parse_json(
-        json_content, args.tz, args.date_range, args.time_range
+        json_content, args.tz, args.date_range, args.time_range, search_grid
     )
     if args.date_range and args.time_range:
         filename = f"{filename}-{args.date_range}"
@@ -739,7 +762,7 @@ def main():
             "[-] Generating KML file. This can take a long time for large datasets. Please be patient."
         )
         print(f"[-] Started KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        generate_kml(filename, parsed_data, fmt, args.batch, search_grid)
+        generate_kml(filename, parsed_data, fmt, args.batch)
         print(
             f"[+] Finished KML generation at {dt.now().strftime('%Y-%m-%d %H:%M:%S')}"
         )
